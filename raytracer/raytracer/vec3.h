@@ -50,3 +50,5 @@ inline vec3 operator/(const vec3 &v1, float t);
 
 inline float dot(const vec3 &v1, const vec3 &v2);
 inline vec3 cross(const vec3 &v1, const vec3 &v2);
+
+inline vec3 unit_vector(const vec3 &v);
