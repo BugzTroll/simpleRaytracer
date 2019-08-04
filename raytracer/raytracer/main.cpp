@@ -3,9 +3,12 @@
 #include "vec3.h"
 #include "vec3.cpp"
 #include "ray.h"
+#include "sphere.h"
+#include "hitable_list.h"
 #include <math.h>
 
 using namespace std;
+
 
 float hit_sphere(const vec3& center, float radius, const ray& r) {
     vec3 oc = r.origin() - center;
@@ -21,18 +24,26 @@ float hit_sphere(const vec3& center, float radius, const ray& r) {
     }
 }
 
-vec3 color(const ray& r){
-    float t = hit_sphere(vec3(0, 0, -1), 0.5, r);
-    if(t > 0.0){
+vec3 color(const ray& r, hitable *world){
+    //float t = hit_sphere(vec3(0, 0, -1), 0.5, r);
+
+    hit_record rec;
+
+    if (world->hit(r,0.0, std::numeric_limits<float>::max(), rec)) {
+        return vec3(rec.normal.x() + 1, rec.normal.y() + 1, rec.normal.z() + 1) * 0.5;
+    } else {
+        vec3 unit_direction = unit_vector(r.direction());
+        float a = 0.5 * (unit_direction.y() + 1.0);
+        return (vec3(1.0, 1.0, 1.0) * (1.0 - a)) + (vec3(0.5, 0.7, 1.0) * a);
+    }
+ /*   if(t > 0.0){
         vec3 pointOnSphere = r.point_at_parameter(t);
         vec3 normal = unit_vector(pointOnSphere - vec3(0, 0, -1));
-        cout << r.point_at_parameter(t).z();
-        //cout << normal.z() << endl;
         return vec3(normal.x() + 1, normal.y() + 1, normal.z() + 1) * 0.5;
     }
     vec3 unit_direction = unit_vector(r.direction());
     float a = 0.5 * (unit_direction.y() + 1.0);
-    return (vec3(1.0, 1.0, 1.0) * (1.0 - a)) + (vec3(0.5, 0.7, 1.0) * a);
+    return (vec3(1.0, 1.0, 1.0) * (1.0 - a)) + (vec3(0.5, 0.7, 1.0) * a);*/
 }
 int main()
 {
@@ -40,6 +51,10 @@ int main()
   
     ofstream myfile;
     myfile.open("outputImages/outputImage.ppm");
+
+    hitable* list[1];
+
+    list[0] = new sphere(vec3(0, 0, -1), 0.5);
 
     int nx = 200;
     int ny = 100;
