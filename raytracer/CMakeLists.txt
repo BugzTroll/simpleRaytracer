@@ -6,5 +6,6 @@ include_directories(include)
 
 #However, the file(GLOB...) allows for wildcard additions:
 file(GLOB SOURCES "src/*.cpp")
+file(GLOB HEADER_FILES "include/*.h")
 
-add_executable(raytracer ${SOURCES})
+add_executable(raytracer ${SOURCES} ${HEADER_FILES})
