@@ -19,28 +19,26 @@
 #include <glad/glad.h>
 #include <vector>
 #include <algorithm> 
-
+#include "metal.h"
+#include "lambertian.h"
 
 using namespace std;
 
-vec3 randomInUnitSphere()
-{
-	vec3 p;
-	do
-	{
-		p = 2.0 * vec3(rand() / double(RAND_MAX), rand() / double(RAND_MAX), rand() / double(RAND_MAX)) - vec3(1,1,1);
-	} 
-	while (p.square_length() >= 1);
-	return p;
-}
-
-vec3 color(const ray& r, hitable* world)
+vec3 color(const ray& r, hitable* world, int depth)
 {
 	hitRecord rec;
 	if (world->hit(r, 0.001, numeric_limits<float>::max(), rec))
 	{
-		vec3 target = rec.p + rec.normal + randomInUnitSphere();
-		return (0.5 * color(ray(rec.p, target - rec.p), world));
+		ray scattered;
+		vec3 attenuation;
+		if (depth < 50 && rec.matPtr->scatter(r, rec, attenuation, scattered))
+		{
+			return attenuation * color(scattered, world, depth + 1);
+		}
+		else
+		{
+			return vec3(0, 0, 0);
+		}
 	}
 	else
 	{
@@ -49,21 +47,6 @@ vec3 color(const ray& r, hitable* world)
 		return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 	}
 }
-
-// Shaders
-//const char* vertexShaderSource = "#version 330 core\n"
-//"layout (location = 0) in vec3 aPos;\n"
-//"void main()\n"
-//"{\n"
-//"   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-//"}\0";
-
-//const char* fragmentShaderSource = "#version 330 core\n"
-//"out vec4 FragColor;\n"
-//"void main()\n"
-//"{\n"
-//"	FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-//"}\0";
 
 const char* vertexShaderSource =
 "#version 330 core\n"
@@ -282,10 +265,14 @@ int main()
 
 	camera cam;
 
-	hitable* list[2];
-	list[0] = new sphere(vec3(0, 0, -1), 0.5);
-	list[1] = new sphere(vec3(0, -100.5, -1), 100);
-	hitable* world = new hitableList(list, 2);
+	new lambertian(vec3());
+
+	hitable* list[4];
+	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.8, 0.3, 0.3)));
+	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
+	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8,0.6,0.2), 0.3));
+	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new metal(vec3(0.8,0.8,0.8), 1.0));
+	hitable* world = new hitableList(list, 4);
 	myfile << "P6\n" << nx << " " << ny << "\n255\n";
 
 	// Send rays for every pixels
@@ -302,7 +289,7 @@ int main()
 
 				ray r = cam.getRay(u, v);
 				vec3 p = r.pointAtParameter(2.0);
-				col += color(r, world);
+				col += color(r, world, 0);
 			}
 
 			col /= float(ns);
