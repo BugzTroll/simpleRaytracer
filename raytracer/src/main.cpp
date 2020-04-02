@@ -8,6 +8,10 @@
 #include <stdlib.h>
 #include <GLFW/glfw3.h>
 #include <math.h>
+#include <vector>
+#include <algorithm> 
+
+#include <glad/glad.h>
 
 #include "vec3.h"
 #include "vec3.cpp"
@@ -15,12 +19,9 @@
 #include "hitableList.h"
 #include "sphere.h"
 #include "camera.h"
-
-#include <glad/glad.h>
-#include <vector>
-#include <algorithm> 
 #include "metal.h"
 #include "lambertian.h"
+#include "dielectric.h"
 
 using namespace std;
 
@@ -268,11 +269,12 @@ int main()
 	new lambertian(vec3());
 
 	hitable* list[4];
-	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.8, 0.3, 0.3)));
+	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
 	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
 	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8,0.6,0.2), 0.3));
-	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new metal(vec3(0.8,0.8,0.8), 1.0));
-	hitable* world = new hitableList(list, 4);
+	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
+	list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
+	hitable* world = new hitableList(list, 5);
 	myfile << "P6\n" << nx << " " << ny << "\n255\n";
 
 	// Send rays for every pixels
