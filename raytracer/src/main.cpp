@@ -22,6 +22,7 @@
 #include "metal.h"
 #include "lambertian.h"
 #include "dielectric.h"
+#include <thread>
 
 using namespace std;
 
@@ -74,8 +75,47 @@ const char* fragmentShaderSource =
 "	FragColor = texture(ourTexture, TexCoord);\n"
 "}\0";
 
+unsigned int generateTexture(GLubyte* data, size_t width, size_t height)
+{
+	unsigned int texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	// set the texture wrapping/filtering options (on the currently bound texture object)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-unsigned int generateTexture(int shaderProgram)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else
+	{
+		std::cout << "Failed to set texture" << std::endl;
+	}
+
+	return texture;
+}
+
+void setTextureBytes(GLubyte* data, size_t width, size_t height)
+{
+	glBindTexture(GL_TEXTURE_2D, 1);
+
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else
+	{
+		std::cout << "Failed to set texture" << std::endl;
+	}
+}
+
+unsigned int loadTexture(std::string filepath)
 {
 	unsigned int texture;
 	glGenTextures(1, &texture);
@@ -102,7 +142,41 @@ unsigned int generateTexture(int shaderProgram)
 	}
 	stbi_image_free(data);
 
-	glUseProgram(shaderProgram);
+	//glUseProgram(shaderProgram);
+
+	return texture;
+}
+
+
+unsigned int generateTexture()
+{
+	unsigned int texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	// set the texture wrapping/filtering options (on the currently bound texture object)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	int width, height, nrChannels;
+	stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+	unsigned char* data = stbi_load("../outputImages/outputImage.pnm", &width, &height, &nrChannels, 0);
+
+
+	if (data)
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+
+	//glUseProgram(shaderProgram);
 
 	return texture;
 }
@@ -188,48 +262,32 @@ unsigned int bindVerticeBuffers()
 	return VAO;
 }
 
-int createWindow(int width, int height)
+void refresh(GLFWwindow* window, unsigned int VAO, int shaderProgram)
 {
-	GLFWwindow* window;
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
 
-	/* Initialize the library */
-	if (!glfwInit())
-		return -1;
+	glActiveTexture(GL_TEXTURE0);
+	//glBindTexture(GL_TEXTURE_2D, texture);
+	glBindTexture(GL_TEXTURE_2D, 1);
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glUseProgram(shaderProgram);
+	glBindVertexArray(VAO);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(width, height, "Hello World", NULL, NULL);
-	if (!window)
-	{
-		glfwTerminate();
-		return -1;
-	}
+	glfwSwapBuffers(window);
+	/* Poll for and process events */
+	glfwPollEvents();
+}
 
-	/* Make the window's context current */
-	glfwMakeContextCurrent(window);
-
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
-		return -1;
-	}
-
-	// set gl viewport
-	glViewport(0, 0, width, height);
-
+int startRenderLoop(GLFWwindow* window)
+{
 	// build shaders
 	int shaderProgram = buildShaders();
 
 	// bind buffers
 	unsigned int VAO = bindVerticeBuffers();
 
-	// load and bind texture
-	unsigned int texture = generateTexture(shaderProgram);
-
-	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
 	{
 		/* Render here */
@@ -237,7 +295,8 @@ int createWindow(int width, int height)
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture);
+		//glBindTexture(GL_TEXTURE_2D, texture);
+		glBindTexture(GL_TEXTURE_2D, 1);
 
 		glUseProgram(shaderProgram);
 		glBindVertexArray(VAO);
@@ -250,7 +309,43 @@ int createWindow(int width, int height)
 	}
 
 	glfwTerminate();
+
 	return 0;
+
+}
+
+GLFWwindow* createWindow(int width, int height)
+{
+	GLFWwindow* window;
+
+	/* Initialize the library */
+	if (!glfwInit())
+		return nullptr;
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	/* Create a windowed mode window and its OpenGL context */
+	window = glfwCreateWindow(width, height, "Hello World", NULL, NULL);
+	if (!window)
+	{
+		glfwTerminate();
+		return nullptr;
+	}
+
+	/* Make the window's context current */
+	glfwMakeContextCurrent(window);
+
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return nullptr;
+	}
+
+	// set gl viewport
+	glViewport(0, 0, width, height);
+	return window;
 }
 
 hitable* randomScene() {
@@ -294,16 +389,18 @@ hitable* randomScene() {
 	return new hitableList(list, i);
 }
 
-int main()
+void raytraceScene(size_t width, size_t height)
 {
 	std::cout << "Writing to file" << endl;
 
 	// open image file
 	ofstream myfile("../outputImages/outputImage.pnm", std::ios::binary);
 
-	int nx = 400;
-	int ny = 200;
-	int ns = 10;
+	int nx = width;
+	int ny = height;
+	int ns = 1;
+
+	std::vector<GLubyte> imagePixels(nx * ny * 3);
 
 	vec3 lookFrom(13, 2, 3);
 	vec3 lookAt(0, 0, 0);
@@ -319,7 +416,7 @@ int main()
 	myfile << "P6\n" << nx << " " << ny << "\n255\n";
 
 	// Send rays for every pixels
-	int cpt = 0;
+	int index = 0;
 	for (int j = ny - 1; j >= 0; j--) {
 		for (int i = 0; i < nx; i++) {
 
@@ -344,14 +441,117 @@ int main()
 			unsigned char g = static_cast<unsigned char>(std::min(1.f, col.g()) * 255);
 			unsigned char b = static_cast<unsigned char>(std::min(1.f, col.b()) * 255);
 			myfile << r << g << b;
+
+			imagePixels[index] = (GLubyte)(std::min(1.f, col.r()) * 255);
+			imagePixels[index + 1] = (GLubyte)(std::min(1.f, col.g()) * 255);
+			imagePixels[index + 2] = (GLubyte)(std::min(1.f, col.b()) * 255);
+			index += 3;
 		}
 	}
 
 	myfile.close();
 
 	std::cout << "done" << endl;
+}
 
-	createWindow(nx, ny);
+int main()
+{
+	std::cout << "Writing to file" << endl;
+
+	// open image file
+	ofstream myfile("../outputImages/outputImage.pnm", std::ios::binary);
+
+	int nx = 400;
+	int ny = 200;
+	int ns = 10;
+
+	GLFWwindow* window = createWindow(nx, ny);
+	std::vector<GLubyte> imagePixels(nx * ny * 3);
+
+	for (size_t i = 0; i < imagePixels.size(); i += 3)
+	{
+		imagePixels[i] = (GLubyte)0;
+		imagePixels[i + 1] = (GLubyte)0;
+		imagePixels[i + 2] = (GLubyte)0;
+	}
+
+	generateTexture(imagePixels.data(), nx, ny);
+
+	// build shaders
+	int shaderProgram = buildShaders();
+
+	// bind buffers
+	unsigned int VAO = bindVerticeBuffers();
+
+	refresh(window, VAO, shaderProgram);
+
+	std::thread first(raytraceScene, nx, ny);
+
+	//vec3 lookFrom(13, 2, 3);
+	//vec3 lookAt(0, 0, 0);
+	//float distToFocus = 10.0f;
+	//float aperture = 0.1f;
+
+	//camera cam(lookFrom, lookAt, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, distToFocus);
+	//float R = cos(M_PI_4);
+
+	//new lambertian(vec3());
+
+	//hitable* world = randomScene();
+	//myfile << "P6\n" << nx << " " << ny << "\n255\n";
+
+	//// Send rays for every pixels
+	//int index = 0;
+	//for (int j = ny - 1; j >= 0; j--) {
+	//	for (int i = 0; i < nx; i++) {
+
+	//		// Average the color to get antialiased image
+	//		vec3 col(0, 0, 0);
+	//		for (int s = 0; s < ns; s++)
+	//		{
+	//			float u = (float(i) + (rand() / double(RAND_MAX))) / float(nx);
+	//			float v = (float(j) + (rand() / double(RAND_MAX))) / float(ny);
+
+	//			ray r = cam.getRay(u, v);
+	//			vec3 p = r.pointAtParameter(2.0);
+	//			col += color(r, world, 0);
+	//		}
+
+	//		col /= float(ns);
+
+	//		//gamma correction
+	//		col = vec3(sqrt(col.r()), sqrt(col.g()), sqrt(col.b()));
+
+	//		unsigned char r = static_cast<unsigned char>(std::min(1.f, col.r()) * 255);
+	//		unsigned char g = static_cast<unsigned char>(std::min(1.f, col.g()) * 255);
+	//		unsigned char b = static_cast<unsigned char>(std::min(1.f, col.b()) * 255);
+	//		myfile << r << g << b;
+
+	//		imagePixels[index] = (GLubyte)(std::min(1.f, col.r()) * 255);
+	//		imagePixels[index + 1] = (GLubyte)(std::min(1.f, col.g()) * 255);
+	//		imagePixels[index + 2] = (GLubyte)(std::min(1.f, col.b()) * 255);
+	//		index += 3;
+	//	}
+
+	//	setTextureBytes(imagePixels.data(), nx, ny);
+	//	refresh(window, VAO, shaderProgram);
+	//}
+
+	//myfile.close();
+
+	//std::cout << "done" << endl;
+
+	setTextureBytes(imagePixels.data(), nx, ny);
+	refresh(window, VAO, shaderProgram);
+
+	startRenderLoop(window);
+
+	//std::thread first(startRenderLoop, window);
+
+	//loadTexture("../outputImages/outputImage.pnm");
+	//startRenderLoop(window);
+
+	//createWindow(nx, ny);
 
 	std::cin >> nx;
 	return 0;
