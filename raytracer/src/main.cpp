@@ -188,7 +188,7 @@ unsigned int bindVerticeBuffers()
 	return VAO;
 }
 
-int createWindow()
+int createWindow(int width, int height)
 {
 	GLFWwindow* window;
 
@@ -201,7 +201,7 @@ int createWindow()
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(800, 400, "Hello World", NULL, NULL);
+	window = glfwCreateWindow(width, height, "Hello World", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -218,7 +218,7 @@ int createWindow()
 	}
 
 	// set gl viewport
-	glViewport(0, 0, 800, 400);
+	glViewport(0, 0, width, height);
 
 	// build shaders
 	int shaderProgram = buildShaders();
@@ -253,6 +253,47 @@ int createWindow()
 	return 0;
 }
 
+hitable* randomScene() {
+	int n = 500;
+	hitable** list = new hitable * [n + 1];
+	list[0] = new sphere(vec3(0, -1000, 0), 1000, new lambertian(vec3(0.5, 0.5, 0.5)));
+	int i = 1;
+	for (int a = -11; a < 11; a++) {
+		for (int b = -11; b < 11; b++) {
+			float chooseMat = utilities::randomDouble();
+			vec3 center(a + 0.9 * utilities::randomDouble(), 0.2, b + 0.9 * utilities::randomDouble());
+			if ((center - vec3(4, 0.2, 0)).length() > 0.9) {
+				if (chooseMat < 0.8) {  // diffuse
+					list[i++] = new sphere(
+						center, 0.2,
+						new lambertian(vec3(utilities::randomDouble() * utilities::randomDouble(),
+							utilities::randomDouble() * utilities::randomDouble(),
+							utilities::randomDouble() * utilities::randomDouble()))
+						);
+				}
+				else if (chooseMat < 0.95) { // metal
+					list[i++] = new sphere(
+						center, 0.2,
+						new metal(vec3(0.5 * (1 + utilities::randomDouble()),
+							0.5 * (1 + utilities::randomDouble()),
+							0.5 * (1 + utilities::randomDouble())),
+							0.5 * utilities::randomDouble())
+						);
+				}
+				else {  // glass
+					list[i++] = new sphere(center, 0.2, new dielectric(1.5));
+				}
+			}
+		}
+	}
+
+	list[i++] = new sphere(vec3(0, 1, 0), 1.0, new dielectric(1.5));
+	list[i++] = new sphere(vec3(-4, 1, 0), 1.0, new lambertian(vec3(0.4, 0.2, 0.1)));
+	list[i++] = new sphere(vec3(4, 1, 0), 1.0, new metal(vec3(0.7, 0.6, 0.5), 0.0));
+
+	return new hitableList(list, i);
+}
+
 int main()
 {
 	std::cout << "Writing to file" << endl;
@@ -260,24 +301,21 @@ int main()
 	// open image file
 	ofstream myfile("../outputImages/outputImage.pnm", std::ios::binary);
 
-	int nx = 200;
-	int ny = 100;
-	int ns = 100;
+	int nx = 400;
+	int ny = 200;
+	int ns = 10;
 
-	camera cam(vec3(-2, 2, 1), vec3(0, 0, -1), vec3(0, 1, 0), 90, float(nx) / float(ny));
+	vec3 lookFrom(13, 2, 3);
+	vec3 lookAt(0, 0, 0);
+	float distToFocus = 10.0f;
+	float aperture = 0.1f;
+
+	camera cam(lookFrom, lookAt, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, distToFocus);
 	float R = cos(M_PI_4);
 
 	new lambertian(vec3());
 
-	hitable* list[4];
-	//list[0] = new sphere(vec3(-R, 0, -1), R, new lambertian(vec3(0, 0, 1)));
-	//list[1] = new sphere(vec3(R, 0, -1), R, new lambertian(vec3(1, 0, 0)));
-	list[0] = new sphere(vec3(0, 0, -1), 0.5, new lambertian(vec3(0.1, 0.2, 0.5)));
-	list[1] = new sphere(vec3(0, -100.5, -1), 100, new lambertian(vec3(0.8, 0.8, 0.0)));
-	list[2] = new sphere(vec3(1, 0, -1), 0.5, new metal(vec3(0.8, 0.6, 0.2), 0.3));
-	list[3] = new sphere(vec3(-1, 0, -1), 0.5, new dielectric(1.5));
-	//list[4] = new sphere(vec3(-1, 0, -1), -0.45, new dielectric(1.5));
-	hitable* world = new hitableList(list, 4);
+	hitable* world = randomScene();
 	myfile << "P6\n" << nx << " " << ny << "\n255\n";
 
 	// Send rays for every pixels
@@ -311,9 +349,9 @@ int main()
 
 	myfile.close();
 
-	createWindow();
-
 	std::cout << "done" << endl;
+
+	createWindow(nx, ny);
 
 	std::cin >> nx;
 	return 0;

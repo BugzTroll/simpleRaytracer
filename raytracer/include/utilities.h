@@ -15,6 +15,22 @@ namespace utilities
 		return p;
 	};
 
+	vec3 randomInUnitDisk()
+	{
+		vec3 p;
+		do
+		{
+			p = 2.0 * vec3(rand() / (float)RAND_MAX, rand() / (float)RAND_MAX, 0) - vec3(1, 1, 0);
+
+		} while (dot(p, p) >= 1.0);
+		return p;
+	}
+
+	double randomDouble()
+	{
+		return rand() / (float)RAND_MAX;
+	}
+
 	vec3 reflect(const vec3& v, const vec3& n)
 	{
 		return v - 2 * dot(v, n) * n;
