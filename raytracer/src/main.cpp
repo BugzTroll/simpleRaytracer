@@ -26,6 +26,8 @@
 
 using namespace std;
 
+bool textureNeedsUpdate = false;
+
 vec3 color(const ray& r, hitable* world, int depth)
 {
 	hitRecord rec;
@@ -262,58 +264,6 @@ unsigned int bindVerticeBuffers()
 	return VAO;
 }
 
-void refresh(GLFWwindow* window, unsigned int VAO, int shaderProgram)
-{
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	glActiveTexture(GL_TEXTURE0);
-	//glBindTexture(GL_TEXTURE_2D, texture);
-	glBindTexture(GL_TEXTURE_2D, 1);
-
-	glUseProgram(shaderProgram);
-	glBindVertexArray(VAO);
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-	glfwSwapBuffers(window);
-	/* Poll for and process events */
-	glfwPollEvents();
-}
-
-int startRenderLoop(GLFWwindow* window)
-{
-	// build shaders
-	int shaderProgram = buildShaders();
-
-	// bind buffers
-	unsigned int VAO = bindVerticeBuffers();
-
-	while (!glfwWindowShouldClose(window))
-	{
-		/* Render here */
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		glActiveTexture(GL_TEXTURE0);
-		//glBindTexture(GL_TEXTURE_2D, texture);
-		glBindTexture(GL_TEXTURE_2D, 1);
-
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-		/* Swap front and back buffers */
-		glfwSwapBuffers(window);
-		/* Poll for and process events */
-		glfwPollEvents();
-	}
-
-	glfwTerminate();
-
-	return 0;
-
-}
-
 GLFWwindow* createWindow(int width, int height)
 {
 	GLFWwindow* window;
@@ -327,7 +277,7 @@ GLFWwindow* createWindow(int width, int height)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(width, height, "Hello World", NULL, NULL);
+	window = glfwCreateWindow(width, height, "Marie's Raytracer <3", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -389,7 +339,7 @@ hitable* randomScene() {
 	return new hitableList(list, i);
 }
 
-void raytraceScene(size_t width, size_t height)
+void raytraceScene(size_t width, size_t height, vector<GLubyte> &imgData)
 {
 	std::cout << "Writing to file" << endl;
 
@@ -398,9 +348,7 @@ void raytraceScene(size_t width, size_t height)
 
 	int nx = width;
 	int ny = height;
-	int ns = 1;
-
-	std::vector<GLubyte> imagePixels(nx * ny * 3);
+	int ns = 10;
 
 	vec3 lookFrom(13, 2, 3);
 	vec3 lookAt(0, 0, 0);
@@ -415,9 +363,10 @@ void raytraceScene(size_t width, size_t height)
 	hitable* world = randomScene();
 	myfile << "P6\n" << nx << " " << ny << "\n255\n";
 
-	// Send rays for every pixels
 	int index = 0;
+	// Send rays for every pixels
 	for (int j = ny - 1; j >= 0; j--) {
+		index = j * nx * 3;
 		for (int i = 0; i < nx; i++) {
 
 			// Average the color to get antialiased image
@@ -437,15 +386,18 @@ void raytraceScene(size_t width, size_t height)
 			//gamma correction
 			col = vec3(sqrt(col.r()), sqrt(col.g()), sqrt(col.b()));
 
+			// add char data
 			unsigned char r = static_cast<unsigned char>(std::min(1.f, col.r()) * 255);
 			unsigned char g = static_cast<unsigned char>(std::min(1.f, col.g()) * 255);
 			unsigned char b = static_cast<unsigned char>(std::min(1.f, col.b()) * 255);
 			myfile << r << g << b;
 
-			imagePixels[index] = (GLubyte)(std::min(1.f, col.r()) * 255);
-			imagePixels[index + 1] = (GLubyte)(std::min(1.f, col.g()) * 255);
-			imagePixels[index + 2] = (GLubyte)(std::min(1.f, col.b()) * 255);
-			index += 3;
+			//save image for real time rendering
+			imgData[index + 3 * i] = (GLubyte)(std::min(1.f, col.r()) * 255);
+			imgData[index + (3 * i) + 1] = (GLubyte)(std::min(1.f, col.g()) * 255);
+			imgData[index + (3 * i) + 2] = (GLubyte)(std::min(1.f, col.b()) * 255);
+
+			textureNeedsUpdate = true;
 		}
 	}
 
@@ -456,26 +408,22 @@ void raytraceScene(size_t width, size_t height)
 
 int main()
 {
-	std::cout << "Writing to file" << endl;
-
-	// open image file
-	ofstream myfile("../outputImages/outputImage.pnm", std::ios::binary);
-
 	int nx = 400;
 	int ny = 200;
 	int ns = 10;
 
 	GLFWwindow* window = createWindow(nx, ny);
-	std::vector<GLubyte> imagePixels(nx * ny * 3);
+	std::vector<GLubyte> imageData(nx * ny * 3);
 
-	for (size_t i = 0; i < imagePixels.size(); i += 3)
+	for (size_t i = 0; i < imageData.size(); i += 3)
 	{
-		imagePixels[i] = (GLubyte)0;
-		imagePixels[i + 1] = (GLubyte)0;
-		imagePixels[i + 2] = (GLubyte)0;
+		imageData[i] = (GLubyte)0;
+		imageData[i + 1] = (GLubyte)0;
+		imageData[i + 2] = (GLubyte)0;
 	}
 
-	generateTexture(imagePixels.data(), nx, ny);
+	// create and bind init texture
+	generateTexture(imageData.data(), nx, ny);
 
 	// build shaders
 	int shaderProgram = buildShaders();
@@ -483,76 +431,35 @@ int main()
 	// bind buffers
 	unsigned int VAO = bindVerticeBuffers();
 
-	refresh(window, VAO, shaderProgram);
+	std::thread first(raytraceScene, nx, ny, std::ref(imageData));
 
-	std::thread first(raytraceScene, nx, ny);
+	while (!glfwWindowShouldClose(window))
+	{
+		if (textureNeedsUpdate)
+		{
+			setTextureBytes(imageData.data(), nx, ny);
+			textureNeedsUpdate = false;
+		}
 
-	//vec3 lookFrom(13, 2, 3);
-	//vec3 lookAt(0, 0, 0);
-	//float distToFocus = 10.0f;
-	//float aperture = 0.1f;
+		/* Render here */
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-	//camera cam(lookFrom, lookAt, vec3(0, 1, 0), 20, float(nx) / float(ny), aperture, distToFocus);
-	//float R = cos(M_PI_4);
+		glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, texture);
+		glBindTexture(GL_TEXTURE_2D, 1);
 
-	//new lambertian(vec3());
+		glUseProgram(shaderProgram);
+		glBindVertexArray(VAO);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-	//hitable* world = randomScene();
-	//myfile << "P6\n" << nx << " " << ny << "\n255\n";
+		/* Swap front and back buffers */
+		glfwSwapBuffers(window);
+		/* Poll for and process events */
+		glfwPollEvents();
+	}
 
-	//// Send rays for every pixels
-	//int index = 0;
-	//for (int j = ny - 1; j >= 0; j--) {
-	//	for (int i = 0; i < nx; i++) {
+	glfwTerminate();
 
-	//		// Average the color to get antialiased image
-	//		vec3 col(0, 0, 0);
-	//		for (int s = 0; s < ns; s++)
-	//		{
-	//			float u = (float(i) + (rand() / double(RAND_MAX))) / float(nx);
-	//			float v = (float(j) + (rand() / double(RAND_MAX))) / float(ny);
-
-	//			ray r = cam.getRay(u, v);
-	//			vec3 p = r.pointAtParameter(2.0);
-	//			col += color(r, world, 0);
-	//		}
-
-	//		col /= float(ns);
-
-	//		//gamma correction
-	//		col = vec3(sqrt(col.r()), sqrt(col.g()), sqrt(col.b()));
-
-	//		unsigned char r = static_cast<unsigned char>(std::min(1.f, col.r()) * 255);
-	//		unsigned char g = static_cast<unsigned char>(std::min(1.f, col.g()) * 255);
-	//		unsigned char b = static_cast<unsigned char>(std::min(1.f, col.b()) * 255);
-	//		myfile << r << g << b;
-
-	//		imagePixels[index] = (GLubyte)(std::min(1.f, col.r()) * 255);
-	//		imagePixels[index + 1] = (GLubyte)(std::min(1.f, col.g()) * 255);
-	//		imagePixels[index + 2] = (GLubyte)(std::min(1.f, col.b()) * 255);
-	//		index += 3;
-	//	}
-
-	//	setTextureBytes(imagePixels.data(), nx, ny);
-	//	refresh(window, VAO, shaderProgram);
-	//}
-
-	//myfile.close();
-
-	//std::cout << "done" << endl;
-
-	setTextureBytes(imagePixels.data(), nx, ny);
-	refresh(window, VAO, shaderProgram);
-
-	startRenderLoop(window);
-
-	//std::thread first(startRenderLoop, window);
-
-	//loadTexture("../outputImages/outputImage.pnm");
-	//startRenderLoop(window);
-
-	//createWindow(nx, ny);
-
-	std::cin >> nx;
 	return 0;
 }
