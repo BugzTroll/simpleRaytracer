@@ -6,6 +6,10 @@ https://www.realtimerendering.com/raytracing/Ray%20Tracing%20in%20a%20Weekend.pd
 
 ![alt text](https://i.imgur.com/Tzn34tD.png "Raytraced Sphere normals")
 
+Raytraced random spheres
+
+![alt text](https://imgur.com/2vYBC9b.png "Raytraced random spheres")
+
 ## Setup
 - Create a folder name Build.
 - Run cmake .. -G "Visual Studio 16 2019" (with your version of VS).
